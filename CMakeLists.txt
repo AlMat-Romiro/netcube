@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 project(netcube)
 
-add_executable(netcube main.cpp src/Texture.cpp src/Shaders.cpp src/ObjectLoader.cpp src/Controls.cpp)
+add_executable(netcube main.cpp src/Texture.cpp src/Shaders.cpp src/ObjectLoader.cpp src/Controls.cpp src/Network.cpp)
 
 find_package(Boost COMPONENTS thread system REQUIRED)
 find_package(OpenGL REQUIRED)

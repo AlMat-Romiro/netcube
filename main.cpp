@@ -14,12 +14,109 @@
 #include <random>
 #include <chrono>
 
+#include <iostream>
+
 #include "include/Texture.h"
 #include "include/Controls.h"
 #include "include/Shaders.h"
+#include "include/Network.h"
+#include "include/Player.h"
 
-int main()
+void server_f()
 {
+	Network::Server server(6666);
+	bool run = true;
+	server.async_acceptConnections(&run);
+
+	std::vector<Player> players;
+
+	while(run)
+	{
+		for (int i = 0; i < server.clients.size(); i++)
+		{
+			if(i > players.size())
+			{
+				Player tmp;
+				tmp.nickname = server.clients[i].recive();
+
+				server.clients[i].send(tmp.position);
+				server.clients[i].send(tmp.rotation);
+				server.clients[i].send(tmp.scale);
+
+				players.push_back(tmp);
+			}
+			server.clients[i].send(server.clients.size()); //send num of clients
+			for (int j = 0; j < server.clients.size(); j++)
+			{
+				if(j!=i)
+				{
+					server.clients[i].send(players[j].nickname);
+					server.clients[i].send(players[j].position);
+					server.clients[i].send(players[j].rotation);
+					server.clients[i].send(players[j].scale);
+				}
+			}
+		}
+	}
+}
+
+void client_f(std::vector<Player>* players, Player* player, Network::Client* client)
+{
+	int numOfPlayers = client->recive_f();
+
+	if(numOfPlayers > players->size())
+		players->push_back(Player());
+
+	for (int i = 0; i < numOfPlayers; i++)
+	{
+		(*players)[i].nickname = client->recive();
+		(*players)[i].position = client->recive_vec3();
+		(*players)[i].rotation = client->recive_vec3();
+		(*players)[i].scale = client->recive_vec3();
+	}
+}
+
+int main(int argc, char** argv)
+{
+	/*std::thread serverThread(server_f);
+	std::chrono::seconds times(2);
+	std::this_thread::sleep_for(times);
+	std::thread clientThread(client_f);
+
+	clientThread.join();
+	serverThread.join();*/
+
+	Network::Client* client;
+	Player player;
+	std::vector<Player> players;
+
+	std::thread clientThread;
+
+	if(argc > 1)
+	{
+		std::string input = argv[1];
+
+		if(input == "server")
+			server_f();
+		else if(input == "client" && argc == 4)
+		{
+			player.nickname = argv[3];
+			client = new Network::Client(std::string(argv[2]), 6666);
+			client->send(player.nickname);
+
+			player.position = client->recive_vec3();
+			player.rotation = client->recive_vec3();
+			player.scale = client->recive_vec3();
+
+			clientThread = std::thread(std::bind(client_f, &players, &player, client));
+
+		} else {
+			std::cout << "Неизвестный аргумент.\n" <<
+				"\t- ./netcube server\n" <<
+				"\t- ./netcube client [ip] [nickname]\n";
+		}
+	}
+
 	if(!glfwInit())
 	{
 	    fmt::print(stderr, "Что то пошло не так с GLFW...\n");
@@ -230,36 +327,41 @@ int main()
 		Controls::compute_input_mat(window);
 		glm::mat4 proj = Controls::get_proj_mat();
         glm::mat4 view = Controls::get_view_mat();
-                
-        glm::mat4 model = glm::mat4(1.0f);
-        
-        model = glm::translate(model, translate);
-        model = glm::rotate(model, glm::radians(rotate.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotate.y), glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotate.z), glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, scale);
-        
-        glm::mat4 mvp = proj * view * model;
-		
-	    glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
+
+		//draw local player
+		glm::mat4 model = glm::mat4(1.0f);
+
+		model = glm::translate(model, player.position);
+		model = glm::rotate(model, glm::radians(player.position.x), glm::vec3(1.0f, 0.0f, 0.0f));
+		model = glm::rotate(model, glm::radians(player.position.y), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::rotate(model, glm::radians(player.position.z), glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::scale(model, player.scale);
+
+		glm::mat4 mvp = proj * view * model;
+
+		glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
+
+		glDrawArrays(GL_TRIANGLES, 0, (sizeof(d_VBO) / sizeof(d_VBO[0])) / 3);
+
+		//draw other players
+		for(int i = 0; i < players.size(); i++)
+		{
+			glm::mat4 model = glm::mat4(1.0f);
+
+			model = glm::translate(model, players[i].position);
+			model = glm::rotate(model, glm::radians(players[i].position.x), glm::vec3(1.0f, 0.0f, 0.0f));
+			model = glm::rotate(model, glm::radians(players[i].position.y), glm::vec3(0.0f, 1.0f, 0.0f));
+			model = glm::rotate(model, glm::radians(players[i].position.z), glm::vec3(0.0f, 0.0f, 1.0f));
+			model = glm::scale(model, players[i].scale);
+
+			glm::mat4 mvp = proj * view * model;
+
+			glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
+
+			glDrawArrays(GL_TRIANGLES, 0, (sizeof(d_VBO) / sizeof(d_VBO[0])) / 3);
+		}
 	    
-	    glDrawArrays(GL_TRIANGLES, 0, (sizeof(d_VBO) / sizeof(d_VBO[0])) / 3);
-	    
-	    /* ----- */
-	    
-	    model = glm::mat4(1.0f);
-        
-        model = glm::translate(model, translate1);
-        model = glm::rotate(model, glm::radians(rotate.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotate.y), glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(rotate.z), glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, scale);
-        
-        mvp = proj * view * model;
-		
-	    glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
-	    
-	    glDrawArrays(GL_TRIANGLES, 0, (sizeof(d_VBO) / sizeof(d_VBO[0])) / 3);
+
 		
 		if(glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
 		{
