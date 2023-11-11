@@ -34,14 +34,11 @@ void server_f()
 	{
 		for (int i = 0; i < server.clients.size(); i++)
 		{
-			if(i > players.size())
+			if(i == server.clients.size())
 			{
+				std::cout << "New client!!!\n";
 				Player tmp;
 				tmp.nickname = server.clients[i].recive();
-
-				server.clients[i].send(tmp.position);
-				server.clients[i].send(tmp.rotation);
-				server.clients[i].send(tmp.scale);
 
 				players.push_back(tmp);
 			}
@@ -56,6 +53,9 @@ void server_f()
 					server.clients[i].send(players[j].scale);
 				}
 			}
+			players[i].position = server.clients[i].recive_vec3();
+			players[i].rotation = server.clients[i].recive_vec3();
+			players[i].scale = server.clients[i].recive_vec3();
 		}
 	}
 }
@@ -67,25 +67,24 @@ void client_f(std::vector<Player>* players, Player* player, Network::Client* cli
 	if(numOfPlayers > players->size())
 		players->push_back(Player());
 
-	for (int i = 0; i < numOfPlayers; i++)
+	for (int i = 0; i < numOfPlayers - 1; i++) //себя не считаем
 	{
 		(*players)[i].nickname = client->recive();
+		std::cout << i << " : nickname: " << (*players)[i].nickname << "\n";
 		(*players)[i].position = client->recive_vec3();
+		std::cout << "position : " << (*players)[i].position.x << " "
+			<< (*players)[i].position.y << " "
+			<< (*players)[i].position.z << "\n";
 		(*players)[i].rotation = client->recive_vec3();
 		(*players)[i].scale = client->recive_vec3();
 	}
+	client->send(player->position);
+	client->send(player->rotation);
+	client->send(player->scale);
 }
 
 int main(int argc, char** argv)
 {
-	/*std::thread serverThread(server_f);
-	std::chrono::seconds times(2);
-	std::this_thread::sleep_for(times);
-	std::thread clientThread(client_f);
-
-	clientThread.join();
-	serverThread.join();*/
-
 	Network::Client* client;
 	Player player;
 	std::vector<Player> players;
@@ -103,10 +102,6 @@ int main(int argc, char** argv)
 			player.nickname = argv[3];
 			client = new Network::Client(std::string(argv[2]), 6666);
 			client->send(player.nickname);
-
-			player.position = client->recive_vec3();
-			player.rotation = client->recive_vec3();
-			player.scale = client->recive_vec3();
 
 			clientThread = std::thread(std::bind(client_f, &players, &player, client));
 
@@ -328,7 +323,7 @@ int main(int argc, char** argv)
 		glm::mat4 proj = Controls::get_proj_mat();
         glm::mat4 view = Controls::get_view_mat();
 
-		//draw local player
+		/*//draw local player
 		glm::mat4 model = glm::mat4(1.0f);
 
 		model = glm::translate(model, player.position);
@@ -341,7 +336,9 @@ int main(int argc, char** argv)
 
 		glUniformMatrix4fv(matrix_id, 1, GL_FALSE, &mvp[0][0]);
 
-		glDrawArrays(GL_TRIANGLES, 0, (sizeof(d_VBO) / sizeof(d_VBO[0])) / 3);
+		glDrawArrays(GL_TRIANGLES, 0, (sizeof(d_VBO) / sizeof(d_VBO[0])) / 3);*/
+
+		player.position = Controls::get_cam_pos();
 
 		//draw other players
 		for(int i = 0; i < players.size(); i++)

@@ -9,4 +9,6 @@ namespace Controls
     
     glm::mat4 get_view_mat();
     glm::mat4 get_proj_mat();
+
+    glm::vec3 get_cam_pos();
 }

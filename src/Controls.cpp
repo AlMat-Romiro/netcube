@@ -43,6 +43,12 @@ glm::mat4 Controls::get_proj_mat()
     return _proj_mat;
 }
 
+glm::vec3 Controls::get_cam_pos()
+{
+    return _pos;
+}
+
+
 void Controls::compute_input_mat(GLFWwindow* window)
 {
     static double last_time = glfwGetTime();
@@ -70,11 +76,24 @@ void Controls::compute_input_mat(GLFWwindow* window)
     float delta_time = static_cast<float>(current_time - last_time);
     
     double xpos, ypos;
+    static double xpos_last = 0.0, ypos_last = 0.0;
     glfwGetCursorPos(window, &xpos, &ypos);
-    glfwSetCursorPos(window, 400, 300);
+    //glfwSetCursorPos(window, 400, 300);
     
-    _h_angle += _mouse_speed * static_cast<float>(400 - xpos);
-    _v_angle += _mouse_speed * static_cast<float>(300 - ypos);
+    bool focused = glfwGetWindowAttrib(window, GLFW_FOCUSED);
+    if(focused)
+    {
+        _h_angle -= _mouse_speed * static_cast<float>(xpos - xpos_last);
+        _v_angle -= _mouse_speed * static_cast<float>(ypos - ypos_last);
+
+        glfwSetWindowAttrib(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    } else
+    {
+        glfwSetWindowAttrib(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+
+    xpos_last = xpos;
+    ypos_last = ypos;
             
     if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
