@@ -71,6 +71,7 @@ void Controls::compute_input_mat(GLFWwindow* window)
     float delta_time = static_cast<float>(current_time - last_time);
     
     double xpos, ypos;
+    static double xpos_last = 0.0, ypos_last = 0.0;
     glfwGetCursorPos(window, &xpos, &ypos);
 
     bool focused = glfwGetWindowAttrib(window, GLFW_FOCUSED);
