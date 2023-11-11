@@ -21,7 +21,7 @@ glm::mat4 _proj_mat;
 glm::vec3 _pos = glm::vec3(0, 0, 5);
 glm::vec3 _smooth_pos;
 
-float _h_angle = 3.14f;
+float _h_angle = 0.0f;
 float _v_angle = 0.0f;
 
 float _fov = 60.0f;
@@ -53,7 +53,7 @@ void Controls::compute_input_mat(GLFWwindow* window)
         glm::sin(_v_angle),
         glm::cos(_v_angle) * glm::cos(_h_angle)
     );
-    
+        
     glm::vec3 right
     (
         glm::sin(_h_angle - 3.14f / 2.0f),
@@ -62,6 +62,7 @@ void Controls::compute_input_mat(GLFWwindow* window)
     );
     
     glm::vec3 up = glm::cross(right, direction);
+    //fmt::print("X: {} Y: {} Z: {}\n", up.x, up.y, up.z);
     
     _proj_mat = glm::perspective(glm::radians(_fov), 4.0f / 3.0f, 0.1f, 100.0f);
     _view_mat = glm::lookAt(_pos, _pos + direction, up);
@@ -71,10 +72,26 @@ void Controls::compute_input_mat(GLFWwindow* window)
     
     double xpos, ypos;
     glfwGetCursorPos(window, &xpos, &ypos);
-    glfwSetCursorPos(window, 400, 300);
-    
-    _h_angle += _mouse_speed * static_cast<float>(400 - xpos);
-    _v_angle += _mouse_speed * static_cast<float>(300 - ypos);
+
+    bool focused = glfwGetWindowAttrib(window, GLFW_FOCUSED);
+    if(focused)
+    {
+        _h_angle -= _mouse_speed * static_cast<float>(xpos - xpos_last);
+        _v_angle -= _mouse_speed * static_cast<float>(ypos - ypos_last);
+        
+        // Ограничение вертикального угла до (-π/2; π/2)
+        // TODO: Переделать в человеческий вид
+        if(_v_angle > 1.57f) _v_angle = 1.57f;
+        if(_v_angle < -1.57f) _v_angle = -1.57f;
+
+        glfwSetWindowAttrib(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    } else
+    {
+        glfwSetWindowAttrib(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+
+    xpos_last = xpos;
+    ypos_last = ypos;
             
     if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
@@ -160,7 +177,7 @@ void Controls::compute_input_mat(GLFWwindow* window)
                 _pos += right * delta_time * _speed.y;
                 break;
         }
-    } 
+    }
     
     if(_last_scan.size() > 2)
     {
