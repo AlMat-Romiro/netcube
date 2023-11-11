@@ -21,94 +21,106 @@
 #include "include/Shaders.h"
 #include "include/Network.h"
 #include "include/Player.h"
+#include "include/Log.h"
 
-void server_f()
+
+Player player;
+std::vector<Player> players;
+bool running = true;
+
+
+void client_f(std::string IP_v4, int port)
 {
-	Network::Server server(6666);
-	bool run = true;
-	server.async_acceptConnections(&run);
+	Network::Client client(IP_v4, port);
+	Log("Подключен к серверу!");
 
-	std::vector<Player> players;
+	client.send(player.nickname);
+	client.send(player.position);
+	client.send(player.rotation);
+	client.send(player.scale);
+	Log("1");
 
-	while(run)
+	while(running)
 	{
-		for (int i = 0; i < server.clients.size(); i++)
+		int srv_playersCount = client.recive_f();
+		if(players.size() < srv_playersCount)
 		{
-			if(i == server.clients.size())
+			for(int i = 0; i < srv_playersCount; i++)
 			{
-				std::cout << "New client!!!\n";
-				Player tmp;
-				tmp.nickname = server.clients[i].recive();
-
-				players.push_back(tmp);
+				players.push_back(Player());
+				Log("added new player");
 			}
-			server.clients[i].send(server.clients.size()); //send num of clients
-			for (int j = 0; j < server.clients.size(); j++)
-			{
-				if(j!=i)
-				{
-					server.clients[i].send(players[j].nickname);
-					server.clients[i].send(players[j].position);
-					server.clients[i].send(players[j].rotation);
-					server.clients[i].send(players[j].scale);
-				}
-			}
-			players[i].position = server.clients[i].recive_vec3();
-			players[i].rotation = server.clients[i].recive_vec3();
-			players[i].scale = server.clients[i].recive_vec3();
 		}
+		Log("Players count = " + std::to_string(players.size()));
+
+		for(int i = 0; i < players.size(); i++)
+		{
+			Log("Recived client ID = " + std::to_string(i));
+			players[i].position = client.recive_vec3();
+			players[i].rotation = client.recive_vec3();
+			players[i].scale    = client.recive_vec3();
+		}
+		client.send(player.position);
+		client.send(player.rotation);
+		client.send(player.scale);
+		Log("sended myself data");
 	}
+	Log("Отключение от сервера...");
+	client.disconnect();
 }
 
-void client_f(std::vector<Player>* players, Player* player, Network::Client* client)
+void f_clientUpdate(Network::Client& client)
 {
-	int numOfPlayers = client->recive_f();
-
-	if(numOfPlayers > players->size())
-		players->push_back(Player());
-
-	for (int i = 0; i < numOfPlayers - 1; i++) //себя не считаем
+	int srv_playersCount = client.recive_f();
+	if(players.size() < srv_playersCount)
 	{
-		(*players)[i].nickname = client->recive();
-		std::cout << i << " : nickname: " << (*players)[i].nickname << "\n";
-		(*players)[i].position = client->recive_vec3();
-		std::cout << "position : " << (*players)[i].position.x << " "
-			<< (*players)[i].position.y << " "
-			<< (*players)[i].position.z << "\n";
-		(*players)[i].rotation = client->recive_vec3();
-		(*players)[i].scale = client->recive_vec3();
+		for(int i = 0; i < srv_playersCount; i++)
+		{
+			players.push_back(Player());
+			Log("added new player");
+		}
 	}
-	client->send(player->position);
-	client->send(player->rotation);
-	client->send(player->scale);
+	Log("Players count = " + std::to_string(players.size()));
+
+	for(int i = 0; i < players.size(); i++)
+	{
+		Log("Recived client ID = " + std::to_string(i));
+		players[i].position = client.recive_vec3();
+		/*players[i].rotation = */client.recive_vec3();
+		/*players[i].scale = */client.recive_vec3();
+	}
+	client.send(player.position);
+	client.send(player.rotation);
+	client.send(player.scale);
+	Log("sended myself data");
 }
 
 int main(int argc, char** argv)
 {
-	Network::Client* client;
-	Player player;
-	std::vector<Player> players;
-
 	std::thread clientThread;
+	Network::Client* client;
 
 	if(argc > 1)
 	{
 		std::string input = argv[1];
 
-		if(input == "server")
-			server_f();
-		else if(input == "client" && argc == 4)
+		if(input == "connect" && argc == 4)
 		{
 			player.nickname = argv[3];
-			client = new Network::Client(std::string(argv[2]), 6666);
-			client->send(player.nickname);
 
-			clientThread = std::thread(std::bind(client_f, &players, &player, client));
+			client = new Network::Client(argv[2], 6666);
+			Log("Подключен к серверу!");
+
+			client->send(player.nickname);
+			client->send(player.position);
+			client->send(player.rotation);
+			client->send(player.scale);
+
+			//clientThread = std::thread(std::bind(client_f, std::string(argv[2]), 6666));
 
 		} else {
 			std::cout << "Неизвестный аргумент.\n" <<
-				"\t- ./netcube server\n" <<
-				"\t- ./netcube client [ip] [nickname]\n";
+				"\t- ./netcube connect [ip] [nickname]\n";
 		}
 	}
 
@@ -155,7 +167,7 @@ int main(int argc, char** argv)
 	glGenVertexArrays(1, &VAO_id);
 	glBindVertexArray(VAO_id);
 	
-	GLuint pid = Shaders::load("triangle.vs", "triangle.fs");
+	GLuint pid = Shaders::load("res/triangle.vs", "res/triangle.fs");
 	    
     GLuint matrix_id = glGetUniformLocation(pid, "MVP");
     GLuint text_sampler  = glGetUniformLocation(pid, "texture_sampler");
@@ -167,9 +179,9 @@ int main(int argc, char** argv)
     glBindTexture(GL_TEXTURE_2D, texture_id);
     glUniform1i(text_sampler, 0);
     
-    Texture test("t_test.png");
-    Texture test1("t_test1.png");
-    Texture test2("t_test2.png");
+    Texture test("res/t_test.png");
+    Texture test1("res/t_test1.png");
+    Texture test2("res/t_test2.png");
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, test.get_width(), test.get_height(), 0, GL_RGB, GL_UNSIGNED_BYTE, test.get_data());
     glGenerateMipmap(GL_TEXTURE_2D);
     
@@ -339,6 +351,8 @@ int main(int argc, char** argv)
 		glDrawArrays(GL_TRIANGLES, 0, (sizeof(d_VBO) / sizeof(d_VBO[0])) / 3);*/
 
 		player.position = Controls::get_cam_pos();
+
+		f_clientUpdate(*client);
 
 		//draw other players
 		for(int i = 0; i < players.size(); i++)

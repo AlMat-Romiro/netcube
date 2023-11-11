@@ -20,7 +20,7 @@ namespace Network
         float recive_f();
         glm::vec3 recive_vec3();
 
-        ~Server_connection();
+        void disconnect();
     private:
         boost::asio::ip::tcp::socket* socket;
     };
@@ -53,7 +53,7 @@ namespace Network
         float recive_f();
         glm::vec3 recive_vec3();
 
-        ~Client();
+        void disconnect();
     private:
         boost::asio::io_service m_service;
         boost::asio::ip::tcp::socket* m_socket;

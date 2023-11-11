@@ -99,11 +99,10 @@ glm::vec3 Network::Server_connection::recive_vec3()
 
 
 
-Network::Server_connection::~Server_connection()
+void Network::Server_connection::disconnect()
 {
-    //socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-    //socket->close();
-    //delete socket;
+    socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+    socket->close();
 }
 
 
@@ -173,10 +172,8 @@ glm::vec3 Network::Client::recive_vec3()
 
 
 
-Network::Client::~Client()
+void Network::Client::disconnect()
 {
-    //m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-    //m_socket->close();
-
-    //delete m_socket;
+    m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+    m_socket->close();
 }
